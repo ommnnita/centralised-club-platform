@@ -8,3 +8,4 @@ passlib[bcrypt]
 python-multipart
 qrcode
 python-dotenv
+psycopg2-binary
