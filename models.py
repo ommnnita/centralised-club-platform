@@ -30,6 +30,7 @@ class User(Base):
     #to know about how many clubs does a user is a part of , we define relationship
     memberships=relationship("Membership",back_populates="student")
 
+    system_role = Column(Enum(SystemRole), default=SystemRole.STUDENT)
     # to know the attendace record of the user for all the activites that has been conducted yet.
     attendance_records=relationship("Attendance",back_populates="student")
 
