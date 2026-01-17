@@ -204,3 +204,43 @@ def generate_qr(
 
     # 6. Return the Image to the Browser
     return StreamingResponse(buf, media_type="image/png")
+# marking the attendence->
+@app.post("/attendance")
+def mark_attendance(
+    attendance_data: schemas.AttendanceCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Does the activity exist?
+    activity = db.query(models.Activity).filter(models.Activity.id == attendance_data.activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    # We check if a row already exists for this User + This Activity
+    existing_record = db.query(models.Attendance).filter(
+        models.Attendance.user_id == current_user.id,
+        models.Attendance.activity_id == activity.id
+    ).first()
+
+    if existing_record:
+        raise HTTPException(status_code=400, detail="Attendance already marked")
+    if not activity.is_public:
+        membership = db.query(models.Membership).filter(
+            models.Membership.user_id == current_user.id,
+            models.Membership.club_id == activity.club_id
+        ).first()
+        
+        if not membership:
+            raise HTTPException(
+                status_code=403, 
+                detail="This is a closed internal event. You must be a club member."
+            )
+
+    new_attendance = models.Attendance(
+        user_id=current_user.id,
+        activity_id=activity.id
+    )
+
+    db.add(new_attendance)
+    db.commit()
+    
+    return {"status": "success", "message": f"Attendance marked for {activity.title}"}
