@@ -128,3 +128,41 @@ def create_club(
     db.commit() # Save the membership
 
     return new_club
+
+#creating an activity:
+@app.post("/clubs/{club_id}/activities", response_model=schemas.ActivityOut)
+def create_activity(
+    club_id: int, 
+    activity: schemas.ActivityCreate, 
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+
+#checaking whether the club exist or not?
+    club = db.query(models.Club).filter(models.Club.id == club_id).first()
+    if not club:
+        raise HTTPException(status_code=404, detail="Club not found")
+    # 2. PERMISSION CHECK (The Gatekeeper)
+    # We query the 'Membership' table to find the link between THIS user and THIS club.
+    membership = db.query(models.Membership).filter(
+        models.Membership.user_id == current_user.id,
+        models.Membership.club_id == club_id
+    ).first()
+    if not membership or membership.role != models.ClubRole.ADMIN:
+        raise HTTPException(
+            status_code=403, # 403 = Forbidden (You are logged in, but not allowed here)
+            detail="Not authorized to create events for this club"
+        )
+    new_activity = models.Activity(
+        title=activity.title,
+        description=activity.description,
+        event_time=activity.event_time,
+        is_public=activity.is_public,
+        club_id=club_id,
+        # Default state is 'CREATED' (from your Model default), so we don't set it manually
+    )
+    db.add(new_activity)
+    db.commit()
+    db.refresh(new_activity)#to assign an id to the activity
+
+    return new_activity
