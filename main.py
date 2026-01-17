@@ -244,3 +244,35 @@ def mark_attendance(
     db.commit()
     
     return {"status": "success", "message": f"Attendance marked for {activity.title}"}
+
+# --- JOIN CLUB (Immediate) ---
+@app.post("/clubs/{club_id}/join")
+def join_club(
+    club_id: int, 
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Check if Club exists
+    club = db.query(models.Club).filter(models.Club.id == club_id).first()
+    if not club:
+        raise HTTPException(status_code=404, detail="Club not found")
+
+    # 2. Check if already a member
+    existing_membership = db.query(models.Membership).filter(
+        models.Membership.user_id == current_user.id,
+        models.Membership.club_id == club_id
+    ).first()
+
+    if existing_membership:
+        raise HTTPException(status_code=400, detail="Already a member")
+
+    # 3. Create Membership (Role = MEMBER)
+    new_membership = models.Membership(
+        user_id=current_user.id,
+        club_id=club_id,
+        role=models.ClubRole.MEMBER # Default role
+    )
+    db.add(new_membership)
+    db.commit()
+
+    return {"message": "Successfully joined the club"}
