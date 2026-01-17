@@ -66,3 +66,65 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
     return {"access_token": access_token, "token_type": "bearer"}
 
+#setting the flow for the club and actity
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+#this extract the token from the http request
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    #dependece provide control acess to oauth2_schema
+    #depndece control lifecycly of get_db
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        # Decode the token using the Secret Key
+        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    # Check if this user actually exists in the DB
+    user = db.query(models.User).filter(models.User.id == int(user_id)).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+#the club creation endpoint
+
+@app.post("/clubs", response_model=schemas.ClubOut)
+def create_club(
+    club: schemas.ClubCreate, 
+    # v-- THE DEPENDENCY: Validates token & gives us the User object
+    current_user: models.User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    # 1. Check if Club Name exists (Unique Constraint)
+    db_club = db.query(models.Club).filter(models.Club.name == club.name).first()
+    if db_club:
+        raise HTTPException(status_code=400, detail="Club name already taken")
+
+    # 2. Create the Club
+    new_club = models.Club(
+        name=club.name,
+        description=club.description
+    )
+    db.add(new_club)
+    db.commit()      # We commit to generate the Club ID
+    db.refresh(new_club)
+
+    # 3. THE CHAIN REACTION (Assign Admin)
+    # We automatically create a Membership for the Creator with role='admin'
+    admin_membership = models.Membership(
+        user_id=current_user.id,
+        club_id=new_club.id,
+        role=models.ClubRole.ADMIN
+    )
+    db.add(admin_membership)
+    db.commit() # Save the membership
+
+    return new_club
