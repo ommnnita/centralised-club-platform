@@ -1,3 +1,6 @@
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.requests import Request # Needed for returning HTML
 from fastapi import FastAPI,Depends, HTTPException, status
 from database import engine, Base, get_db
 from sqlalchemy.orm import Session
@@ -17,6 +20,12 @@ from fastapi.responses import StreamingResponse
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# This tells FastAPI: "If a URL starts with /static, look in the 'static' folder."
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# This points to 'templates' folder
+templates = Jinja2Templates(directory="templates")
 
 @app.get("/")
 def read_root():
