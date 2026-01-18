@@ -13,6 +13,7 @@ import auth
 import qrcode
 from io import BytesIO
 from fastapi.responses import StreamingResponse
+from typing import list
 
 # 1. CREATE TABLES
 # This line says: "Look at all classes in models.py and create tables for them in the DB"
@@ -286,6 +287,17 @@ def join_club(
 
     return {"message": "Successfully joined the club"}
 
+# URL: GET /clubs
+@app.get("/clubs", response_model=List[schemas.ClubOut])
+def get_clubs(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
+    # Simple query to fetch all clubs
+    clubs = db.query(models.Club).offset(skip).limit(limit).all()
+    return clubs
+
 # --- FRONTEND ROUTES ---
 
 # 1. SERVE LOGIN PAGE
@@ -300,3 +312,8 @@ def signup_page(request: Request):
     # You can create a copy of login.html called signup.html later
     # For now, let's just use a placeholder to avoid errors
     return templates.TemplateResponse("base.html", {"request": request})
+
+# 3. SERVE DASHBOARD
+@app.get("/dashboard")
+def dashboard_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
